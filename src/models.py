@@ -16,6 +16,19 @@ GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 class BaseModel:
     """モデルの基底クラス"""
     def __init__(self):
+        # 立場の定義（必要に応じて変更可能）
+        self.position_a = {
+            "name": "革新的な思考",
+            "emoji": "🚀",
+            "focus": "新しいアイデアや斬新なアプローチを重視",
+            "style": "info"
+        }
+        self.position_b = {
+            "name": "保守的な思考",
+            "emoji": "🛡️",
+            "focus": "実現可能性やリスク、既存の枠組みを重視",
+            "style": "warning"
+        }
         self.llm = self._initialize_llm()
         self.chain = self._create_chain()
     
@@ -220,4 +233,62 @@ class EvaluatorOptimizer:
         return {
             "iterations": iterations,
             "final_response": optimized_response['text']
-        } 
+        }
+
+class DebateBasedCooperation(BaseModel):
+    def _create_chain(self) -> LLMChain:
+        """ディベートのプロンプトチェーンを作成"""
+        return LLMChain(
+            llm=self.llm,
+            prompt=PromptTemplate(
+                input_variables=["question", "position_a_name", "position_b_name"],
+                template="""
+                以下の質問について、{position_a_name}と{position_b_name}の両方の視点から議論を行い、最適な回答を導き出してください。
+                質問: {question}
+                """
+            )
+        )
+
+    def generate_debate_response(self, question: str) -> Dict[str, Any]:
+        """ディベートベースの協調パターン"""
+        try:
+            # 立場Aからの意見
+            position_a_opinion = str(self._get_llm_response(
+                f"{self.position_a['name']}の視点から以下の質問について意見を述べてください。{self.position_a['focus']}してください。\n質問: {question}"
+            ))
+            
+            # 立場Bからの反論
+            position_b_rebuttal = str(self._get_llm_response(
+                f"{self.position_b['name']}の視点から以下の意見に対して反論してください。{self.position_b['focus']}してください。\n意見: {position_a_opinion}"
+            ))
+            
+            # 立場Aからの再反論
+            position_a_rebuttal = str(self._get_llm_response(
+                f"{self.position_a['name']}の視点から以下の反論に対して再反論してください。{self.position_a['focus']}してください。\n反論: {position_b_rebuttal}"
+            ))
+            
+            # 立場Bからの再反論
+            position_b_final_rebuttal = str(self._get_llm_response(
+                f"{self.position_b['name']}の視点から以下の再反論に対して最終的な反論をしてください。{self.position_b['focus']}してください。\n再反論: {position_a_rebuttal}"
+            ))
+            
+            # 合意形成
+            consensus = str(self._get_llm_response(
+                f"以下の議論を踏まえて、{self.position_a['name']}と{self.position_b['name']}の両方を考慮した合意形成を行ってください。\n\n{self.position_a['name']}の意見: {position_a_opinion}\n{self.position_b['name']}の反論: {position_b_rebuttal}\n{self.position_a['name']}の再反論: {position_a_rebuttal}\n{self.position_b['name']}の最終反論: {position_b_final_rebuttal}"
+            ))
+            
+            return {
+                "iterations": [{
+                    "iteration": 1,
+                    "position_a_opinion": position_a_opinion,
+                    "position_b_rebuttal": position_b_rebuttal,
+                    "position_a_rebuttal": position_a_rebuttal,
+                    "position_b_final_rebuttal": position_b_final_rebuttal,
+                    "position_a": self.position_a,
+                    "position_b": self.position_b
+                }],
+                "final_response": consensus
+            }
+        except Exception as e:
+            st.error(f"Error in Debate-based Cooperation: {str(e)}")
+            return {"final_response": "処理中にエラーが発生しました。"} 

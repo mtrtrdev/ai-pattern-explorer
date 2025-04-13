@@ -1,5 +1,5 @@
 import streamlit as st
-from models import GeminiChainOfThought, GeminiReasoning, EvaluatorOptimizer
+from models import GeminiChainOfThought, GeminiReasoning, EvaluatorOptimizer, DebateBasedCooperation
 from typing import Dict, Any, List
 from enum import Enum
 
@@ -100,6 +100,7 @@ class AIPatternDemo:
         self.cot_solver = GeminiChainOfThought()
         self.reasoner = GeminiReasoning()
         self.evaluator_optimizer = EvaluatorOptimizer()
+        self.debate_cooperator = DebateBasedCooperation()
         
     def direct_query(self, question: str) -> str:
         """単純な質問応答"""
@@ -109,44 +110,83 @@ class AIPatternDemo:
     def chain_of_thought(self, question: str) -> Dict[str, str]:
         """Chain of Thoughtパターン"""
         result = self.cot_solver.solve_problem(question)
-        return {
-            "analysis": result["analysis"],
-            "thought_process": result["thought_process"],
-            "reasoning": result["reasoning"],
-            "final_answer": result["final_answer"]
-        }
+        return result
     
     def direct_reasoning(self, question: str) -> Dict[str, str]:
         """直接推論パターン"""
         result = self.reasoner.direct_reasoning(question)
-        return {
-            "assumptions": result["assumptions"],
-            "data_processing": result["data_processing"],
-            "reasoning": result["reasoning"]
-        }
+        return result
     
     def chained_reasoning(self, question: str) -> Dict[str, str]:
         """チェーン推論パターン"""
         result = self.reasoner.chained_reasoning(question)
-        return {
-            "decomposition": result["decomposition"],
-            "data_analysis": result["data_analysis"],
-            "assumptions": result["assumptions"],
-            "final_result": result["final_result"]
-        }
+        return result
     
     def evaluator_optimizer_workflow(self, question: str) -> Dict[str, Any]:
         """Evaluator-Optimizerワークフロー"""
         result = self.evaluator_optimizer.generate_optimized_response(question)
-        return {
-            "iterations": [{
-                "iteration": iteration["iteration"],
-                "response": iteration["response"],
-                "evaluation": iteration["evaluation"],
-                "optimized_response": iteration["optimized_response"]
-            } for iteration in result["iterations"]],
-            "final_response": result["final_response"]
-        }
+        return result
+    
+    def debate_based_cooperation(self, question: str) -> Dict[str, Any]:
+        """ディベートベースの協調パターン"""
+        result = self.debate_cooperator.generate_debate_response(question)
+        return result
+
+def format_response(response: Dict[str, Any], pattern: str) -> None:
+    """レスポンスを整形して表示"""
+    if pattern == "シンプルな質問応答":
+        st.write("### 最終回答")
+        st.success(response["final_response"])
+    elif pattern == "段階的思考（Chain of Thought）":
+        st.write("### 最終回答")
+        st.success(response["final_response"])
+        with st.expander("問題分析", expanded=False):
+            st.info(response["analysis"])
+        with st.expander("思考プロセス", expanded=False):
+            st.info(response["thought_process"])
+        with st.expander("推論", expanded=False):
+            st.info(response["reasoning"])
+    elif pattern == "構造化推論":
+        st.write("### 最終回答")
+        st.success(response["final_response"])
+        with st.expander("前提条件", expanded=False):
+            st.info(response["assumptions"])
+        with st.expander("データ処理", expanded=False):
+            st.info(response["data_processing"])
+        with st.expander("推論", expanded=False):
+            st.info(response["reasoning"])
+    elif pattern == "連鎖推論":
+        st.write("### 最終回答")
+        st.success(response["final_response"])
+        with st.expander("問題分解", expanded=False):
+            st.info(response["decomposition"])
+        with st.expander("データ分析", expanded=False):
+            st.info(response["data_analysis"])
+        with st.expander("仮定", expanded=False):
+            st.info(response["assumptions"])
+    elif pattern == "生成と評価の繰り返し":
+        st.write("### 最終回答")
+        st.success(response["final_response"])
+        for iteration in response["iterations"]:
+            with st.expander(f"イテレーション {iteration['iteration']}", expanded=False):
+                st.info(f"生成: {iteration['response']}")
+                st.warning(f"評価: {iteration['evaluation']}")
+                st.success(f"最適化: {iteration['optimized_response']}")
+    elif pattern == "ディベートベースの協調":
+        st.write("### 最終回答（合意形成）")
+        st.success(response["final_response"])
+        for iteration in response["iterations"]:
+            position_a = iteration["position_a"]
+            position_b = iteration["position_b"]
+            with st.expander(f"ディベート {iteration['iteration']}", expanded=False):
+                st.info(f"### {position_a['emoji']} {position_a['name']}からの意見")
+                st.write(iteration["position_a_opinion"])
+                st.warning(f"### {position_b['emoji']} {position_b['name']}からの反論")
+                st.write(iteration["position_b_rebuttal"])
+                st.info(f"### {position_a['emoji']} {position_a['name']}からの再反論")
+                st.write(iteration["position_a_rebuttal"])
+                st.warning(f"### {position_b['emoji']} {position_b['name']}からの最終反論")
+                st.write(iteration["position_b_final_rebuttal"])
 
 def main():
     """メイン関数"""
@@ -287,6 +327,27 @@ def main():
             """,
             "example": "新しい製品のマーケティング戦略を提案してください",
             "steps": ["初期回答生成", "評価", "最適化"]
+        },
+        "ディベートベースの協調": {
+            "description": """
+            **特徴:**
+            - ディベートベースの協調パターン
+            - 2つのAIが協力して高品質な回答を作成
+            - ディベートの結果を利用して回答を改善
+            - より洗練された回答が得られる
+
+            **適しているユースケース:**
+            - 複雑な問題解決
+              - 例：「このビジネスケースの分析を、複数の観点から評価して改善案を提案してください」
+            - 高品質な回答が求められる場合
+              - 例：「この研究論文の要約を、正確性と簡潔さを考慮して作成してください」
+
+            **例:**
+            - 「このビジネスケースの分析を、複数の観点から評価して改善案を提案してください」
+            - 「この研究論文の要約を、正確性と簡潔さを考慮して作成してください」
+            """,
+            "example": "このビジネスケースの分析を、複数の観点から評価して改善案を提案してください",
+            "steps": ["ディベートの準備", "ディベートの実施", "結果の分析"]
         }
     }
     
@@ -333,8 +394,7 @@ def main():
                     display_progress(step_progress, status_container)
                     step_progress.update_status("回答生成", StepStatus.COMPLETED)
                     display_progress(step_progress, status_container)
-                    st.write("### 最終回答")
-                    st.write(result)
+                    format_response(result, pattern)
                 
                 elif pattern == "段階的思考（Chain of Thought）":
                     step_progress.update_status("問題分析", StepStatus.PROCESSING)
@@ -357,8 +417,7 @@ def main():
                     result = demo.chain_of_thought(question)
                     step_progress.update_status("回答生成", StepStatus.COMPLETED)
                     display_progress(step_progress, status_container)
-                    st.write("### 最終回答")
-                    st.write(result)
+                    format_response(result, pattern)
                 
                 elif pattern == "構造化推論":
                     step_progress.update_status("前提条件分析", StepStatus.PROCESSING)
@@ -376,8 +435,7 @@ def main():
                     result = demo.direct_reasoning(question)
                     step_progress.update_status("推論実行", StepStatus.COMPLETED)
                     display_progress(step_progress, status_container)
-                    st.write("### 最終回答")
-                    st.write(result)
+                    format_response(result, pattern)
                 
                 elif pattern == "連鎖推論":
                     step_progress.update_status("問題分解", StepStatus.PROCESSING)
@@ -403,8 +461,7 @@ def main():
                     final_result = demo.chained_reasoning(question)["final_result"]
                     step_progress.update_status("推論実行", StepStatus.COMPLETED)
                     display_progress(step_progress, status_container)
-                    st.write("### 4. 最終結論")
-                    st.success(final_result)
+                    format_response(final_result, pattern)
                 
                 elif pattern == "生成と評価の繰り返し":
                     step_progress.update_status("初期回答生成", StepStatus.PROCESSING)
@@ -425,8 +482,40 @@ def main():
                     step_progress.update_status("最適化", StepStatus.COMPLETED)
                     display_progress(step_progress, status_container)
                     
-                    st.write("### 最終回答")
-                    st.success(optimized_response)
+                    format_response(optimized_response, pattern)
+                
+                elif pattern == "ディベートベースの協調":
+                    step_progress.update_status("ディベートの準備", StepStatus.PROCESSING)
+                    display_progress(step_progress, status_container)
+                    step_progress.update_status("ディベートの準備", StepStatus.COMPLETED)
+                    display_progress(step_progress, status_container)
+
+                    step_progress.update_status("革新的な意見の生成", StepStatus.PROCESSING)
+                    display_progress(step_progress, status_container)
+                    step_progress.update_status("革新的な意見の生成", StepStatus.COMPLETED)
+                    display_progress(step_progress, status_container)
+
+                    step_progress.update_status("保守的な反論の生成", StepStatus.PROCESSING)
+                    display_progress(step_progress, status_container)
+                    step_progress.update_status("保守的な反論の生成", StepStatus.COMPLETED)
+                    display_progress(step_progress, status_container)
+
+                    step_progress.update_status("革新的な再反論の生成", StepStatus.PROCESSING)
+                    display_progress(step_progress, status_container)
+                    step_progress.update_status("革新的な再反論の生成", StepStatus.COMPLETED)
+                    display_progress(step_progress, status_container)
+
+                    step_progress.update_status("保守的な最終反論の生成", StepStatus.PROCESSING)
+                    display_progress(step_progress, status_container)
+                    step_progress.update_status("保守的な最終反論の生成", StepStatus.COMPLETED)
+                    display_progress(step_progress, status_container)
+
+                    step_progress.update_status("合意形成", StepStatus.PROCESSING)
+                    display_progress(step_progress, status_container)
+                    result = demo.debate_based_cooperation(question)
+                    step_progress.update_status("合意形成", StepStatus.COMPLETED)
+                    display_progress(step_progress, status_container)
+                    format_response(result, pattern)
             
             except Exception as e:
                 st.error(f"エラーが発生しました: {str(e)}")
